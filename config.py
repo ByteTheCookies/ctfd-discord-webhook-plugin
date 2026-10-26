@@ -59,8 +59,8 @@ def config(app):
     )
 
     """
-    Post flag sharing caught by the jail_flags plugin (a team submitting a per-connection flag generated for another team).
-    Off by default: DISCORD_WEBHOOK_URL is usually a public channel.
+    Post flag sharing caught by the jail_flags plugin (a team solving with a jail or instance flag of another team; the player is not told).
+    Off by default: DISCORD_WEBHOOK_URL is usually a public channel, and the sharing team would learn it was caught.
     """
     app.config["DISCORD_WEBHOOK_JAIL_FLAGS"] = environ.get(
         "DISCORD_WEBHOOK_JAIL_FLAGS", "false"

@@ -1,29 +1,36 @@
-from flask import request
-from flask.wrappers import Response
-from CTFd.utils.dates import ctftime
-from CTFd.models import Challenges, Solves
-from CTFd.utils import config as ctfd_config
-from CTFd.utils.user import get_current_team, get_current_user
-from discord_webhook import DiscordWebhook, DiscordEmbed
-from functools import wraps
-from .config import config
-
 import re
 import threading
-from urllib.parse import quote
+from functools import wraps
 from types import SimpleNamespace
+from urllib.parse import quote
 
-ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])
-sanreg = re.compile(r'(~|!|@|#|\$|%|\^|&|\*|\(|\)|\_|\+|\`|-|=|\[|\]|;|\'|,|\.|\/|\{|\}|\||:|"|<|>|\?)')
-sanitize = lambda m: sanreg.sub(r'\1',m)
+from CTFd.models import Challenges, Solves
+from CTFd.utils import config as ctfd_config
+from CTFd.utils.dates import ctftime
+from CTFd.utils.user import get_current_team, get_current_user
+from discord_webhook import DiscordEmbed, DiscordWebhook
+from flask import request
+from flask.wrappers import Response
+
+from .config import config
+
+ordinal = lambda n: (
+    "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1) * (n % 10 < 4) * n % 10 :: 4])
+)
+sanreg = re.compile(
+    r'(~|!|@|#|\$|%|\^|&|\*|\(|\)|\_|\+|\`|-|=|\[|\]|;|\'|,|\.|\/|\{|\}|\||:|"|<|>|\?)'
+)
+sanitize = lambda m: sanreg.sub(r"\1", m)
+
 
 def load(app):
     config(app)
     TEAMS_MODE = ctfd_config.is_teams_mode()
 
-    if not app.config['DISCORD_WEBHOOK_URL']:
+    if not app.config["DISCORD_WEBHOOK_URL"]:
         print("No DISCORD_WEBHOOK_URL set! Plugin disabled.")
         return
+
     def challenge_attempt_decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -32,13 +39,20 @@ def load(app):
                 return result
             if isinstance(result, Response):
                 data = result.json
-                if isinstance(data, dict) and data.get("success") == True and isinstance(data.get("data"), dict) and data.get("data").get("status") == "correct":
+                if (
+                    isinstance(data, dict)
+                    and data.get("success") == True
+                    and isinstance(data.get("data"), dict)
+                    and data.get("data").get("status") == "correct"
+                ):
                     if request.content_type != "application/json":
                         request_data = request.form
                     else:
                         request_data = request.get_json()
                     challenge_id = request_data.get("challenge_id")
-                    challenge = Challenges.query.filter_by(id=challenge_id).first_or_404()
+                    challenge = Challenges.query.filter_by(
+                        id=challenge_id
+                    ).first_or_404()
                     solvers = Solves.query.filter_by(challenge_id=challenge.id)
                     if TEAMS_MODE:
                         solvers = solvers.filter(Solves.team.has(hidden=False))
@@ -49,7 +63,7 @@ def load(app):
                     limit = app.config["DISCORD_WEBHOOK_LIMIT"]
                     if int(limit) > 0 and num_solves > int(limit):
                         return result
-                    webhook = DiscordWebhook(url=app.config['DISCORD_WEBHOOK_URL'])
+                    webhook = DiscordWebhook(url=app.config["DISCORD_WEBHOOK_URL"])
 
                     user = get_current_user()
                     team = get_current_team()
@@ -64,19 +78,26 @@ def load(app):
                         "value": challenge.value,
                         "solves": num_solves,
                         "fsolves": ordinal(num_solves),
-                        "category": sanitize(challenge.category)
+                        "category": sanitize(challenge.category),
                     }
 
                     # Add first blood support with a second message
                     if app.config["DISCORD_WEBHOOK_FSTRING"]:
                         data = SimpleNamespace(**format_args)
-                        message = eval("f'{}'".format(app.config['DISCORD_WEBHOOK_MESSAGE'].replace("'", '"')))
+                        message = eval(
+                            "f'{}'".format(
+                                app.config["DISCORD_WEBHOOK_MESSAGE"].replace("'", '"')
+                            )
+                        )
                     else:
-                        message = app.config['DISCORD_WEBHOOK_MESSAGE'].format(**format_args)
+                        message = app.config["DISCORD_WEBHOOK_MESSAGE"].format(
+                            **format_args
+                        )
                     embed = DiscordEmbed(description=message)
                     webhook.add_embed(embed)
                     webhook.execute()
             return result
+
         return wrapper
 
     def patch_challenge_decorator(f):
@@ -90,7 +111,7 @@ def load(app):
                 return f(*args, **kwargs)
 
             # Check if feature is disabled
-            if not app.config['DISCORD_WEBHOOK_CHALL']:
+            if not app.config["DISCORD_WEBHOOK_CHALL"]:
                 return f(*args, **kwargs)
 
             # Check if challenge was visible beforehand (check if published/updated)
@@ -103,7 +124,11 @@ def load(app):
 
             if isinstance(result, Response):
                 data = result.json
-                if isinstance(data, dict) and data.get("success") == True and isinstance(data.get("data"), dict):
+                if (
+                    isinstance(data, dict)
+                    and data.get("success") == True
+                    and isinstance(data.get("data"), dict)
+                ):
                     # For this route, the updated challenge data is returned on success, so we grab it directly:
                     challenge = data.get("data")
                     # Check whether challenge was published,hidden or updated
@@ -116,30 +141,46 @@ def load(app):
                         action = "updated"
 
                     # Make sure the challenge is visible, action is hidden, or override is configured
-                    if not (data.get("data").get("state") == "visible" or action == "hidden" or app.config['DISCORD_WEBHOOK_CHALL_UNPUBLISHED']):
+                    if not (
+                        data.get("data").get("state") == "visible"
+                        or action == "hidden"
+                        or app.config["DISCORD_WEBHOOK_CHALL_UNPUBLISHED"]
+                    ):
                         return result
 
-                    if action == "updated" and not app.config['DISCORD_WEBHOOK_CHALL_UPDATE']:
+                    if (
+                        action == "updated"
+                        and not app.config["DISCORD_WEBHOOK_CHALL_UPDATE"]
+                    ):
                         return result
 
                     format_args = {
                         "challenge": sanitize(challenge.get("name")),
                         "category": sanitize(challenge.get("category")),
-                        "action": sanitize(action)
+                        "action": sanitize(action),
                     }
 
-                    webhook = DiscordWebhook(url=app.config['DISCORD_WEBHOOK_URL'])
-                    message = app.config['DISCORD_WEBHOOK_CHALL_MESSAGE'].format(**format_args)
+                    webhook = DiscordWebhook(url=app.config["DISCORD_WEBHOOK_URL"])
+                    message = app.config["DISCORD_WEBHOOK_CHALL_MESSAGE"].format(
+                        **format_args
+                    )
                     embed = DiscordEmbed(description=message)
                     webhook.add_embed(embed)
                     webhook.execute()
             return result
+
         return wrapper
 
-    app.view_functions['api.challenges_challenge_attempt'] = challenge_attempt_decorator(app.view_functions['api.challenges_challenge_attempt'])
-    app.view_functions['api.challenges_challenge'] = patch_challenge_decorator(app.view_functions['api.challenges_challenge'])
+    app.view_functions["api.challenges_challenge_attempt"] = (
+        challenge_attempt_decorator(
+            app.view_functions["api.challenges_challenge_attempt"]
+        )
+    )
+    app.view_functions["api.challenges_challenge"] = patch_challenge_decorator(
+        app.view_functions["api.challenges_challenge"]
+    )
 
-    if app.config['DISCORD_WEBHOOK_JAIL_FLAGS']:
+    if app.config["DISCORD_WEBHOOK_JAIL_FLAGS"]:
         try:
             from CTFd.plugins import jail_flags
         except ImportError:
@@ -154,15 +195,10 @@ def load(app):
             if kind != "shared":  # same_ip is often just a shared NAT
                 return
             challenge = Challenges.query.filter_by(id=challenge_id).first()
-            message = "🚨 Flag sharing: `{}` submitted a flag of `{}` on `{}` (rejected)".format(
-                sanitize(jail_flags._name(user.account_id)),
-                sanitize(jail_flags._name(other)),
-                sanitize(challenge.name if challenge else str(challenge_id)),
-            )
-            webhook = DiscordWebhook(url=app.config['DISCORD_WEBHOOK_URL'])
+            message = f"🚨 Flag sharing: `{sanitize(jail_flags._name(user.account_id))}` solved `{sanitize(challenge.name if challenge else str(challenge_id))}` with a flag of `{sanitize(jail_flags._name(other))}`"
+            webhook = DiscordWebhook(url=app.config["DISCORD_WEBHOOK_URL"])
             webhook.add_embed(DiscordEmbed(description=message, color=0xFF0000))
             # off the request: discord-webhook 0.8.0 has no timeout, a slow Discord must not hold the submission
             threading.Thread(target=webhook.execute, daemon=True).start()
 
         jail_flags._alert = jail_alert
- 
