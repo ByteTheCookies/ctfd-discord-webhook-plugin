@@ -9,6 +9,7 @@ from functools import wraps
 from .config import config
 
 import re
+import threading
 from urllib.parse import quote
 from types import SimpleNamespace
 
@@ -137,4 +138,31 @@ def load(app):
 
     app.view_functions['api.challenges_challenge_attempt'] = challenge_attempt_decorator(app.view_functions['api.challenges_challenge_attempt'])
     app.view_functions['api.challenges_challenge'] = patch_challenge_decorator(app.view_functions['api.challenges_challenge'])
+
+    if app.config['DISCORD_WEBHOOK_JAIL_FLAGS']:
+        try:
+            from CTFd.plugins import jail_flags
+        except ImportError:
+            print("DISCORD_WEBHOOK_JAIL_FLAGS set but jail_flags plugin not found.")
+            return
+        alert = jail_flags._alert
+
+        # ponytail: wraps a private function of jail_flags, like the view_functions above; breaks if _alert changes signature
+        @wraps(alert)
+        def jail_alert(kind, challenge_id, user, other, ip, flag):
+            alert(kind, challenge_id, user, other, ip, flag)
+            if kind != "shared":  # same_ip is often just a shared NAT
+                return
+            challenge = Challenges.query.filter_by(id=challenge_id).first()
+            message = "🚨 Flag sharing: `{}` submitted a flag of `{}` on `{}` (rejected)".format(
+                sanitize(jail_flags._name(user.account_id)),
+                sanitize(jail_flags._name(other)),
+                sanitize(challenge.name if challenge else str(challenge_id)),
+            )
+            webhook = DiscordWebhook(url=app.config['DISCORD_WEBHOOK_URL'])
+            webhook.add_embed(DiscordEmbed(description=message, color=0xFF0000))
+            # off the request: discord-webhook 0.8.0 has no timeout, a slow Discord must not hold the submission
+            threading.Thread(target=webhook.execute, daemon=True).start()
+
+        jail_flags._alert = jail_alert
  

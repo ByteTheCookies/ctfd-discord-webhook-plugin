@@ -57,3 +57,11 @@ def config(app):
     app.config["DISCORD_WEBHOOK_FSTRING"] = environ.get(
         "DISCORD_WEBHOOK_FSTRING", False
     )
+
+    """
+    Post flag sharing caught by the jail_flags plugin (a team submitting a per-connection flag generated for another team).
+    Off by default: DISCORD_WEBHOOK_URL is usually a public channel.
+    """
+    app.config["DISCORD_WEBHOOK_JAIL_FLAGS"] = environ.get(
+        "DISCORD_WEBHOOK_JAIL_FLAGS", "false"
+    ).lower() in ("1", "true", "yes", "on")
