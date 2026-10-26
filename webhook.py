@@ -196,7 +196,7 @@ def load(app):
                 return
             challenge = Challenges.query.filter_by(id=challenge_id).first()
             message = f"🚨 Flag sharing: `{sanitize(jail_flags._name(user.account_id))}` solved `{sanitize(challenge.name if challenge else str(challenge_id))}` with a flag of `{sanitize(jail_flags._name(other))}`"
-            webhook = DiscordWebhook(url=app.config["DISCORD_WEBHOOK_URL"])
+            webhook = DiscordWebhook(url=app.config["DISCORD_WEBHOOK_JAIL_FLAGS_URL"])
             webhook.add_embed(DiscordEmbed(description=message, color=0xFF0000))
             # off the request: discord-webhook 0.8.0 has no timeout, a slow Discord must not hold the submission
             threading.Thread(target=webhook.execute, daemon=True).start()

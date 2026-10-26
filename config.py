@@ -65,3 +65,11 @@ def config(app):
     app.config["DISCORD_WEBHOOK_JAIL_FLAGS"] = environ.get(
         "DISCORD_WEBHOOK_JAIL_FLAGS", "false"
     ).lower() in ("1", "true", "yes", "on")
+
+    """
+    Webhook URL for the flag sharing alerts, e.g. a private admin channel. Unset: DISCORD_WEBHOOK_URL.
+    """
+    app.config["DISCORD_WEBHOOK_JAIL_FLAGS_URL"] = (
+        environ.get("DISCORD_WEBHOOK_JAIL_FLAGS_URL")
+        or app.config["DISCORD_WEBHOOK_URL"]
+    )
