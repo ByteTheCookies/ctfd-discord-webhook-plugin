@@ -1,6 +1,14 @@
 from os import environ
 
 
+def _bool(name, default):
+    """An on/off setting: 1, true, yes or on (any case) is on, anything else set is off."""
+    value = environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
 def config(app):
     """
     Discord webhook URL to send data to. Set to None to disable plugin entirely.
@@ -25,21 +33,17 @@ def config(app):
     """
     Post webhook message when challenge is changed (published, hidden or updated)
     """
-    app.config["DISCORD_WEBHOOK_CHALL"] = environ.get("DISCORD_WEBHOOK_CHALL", True)
+    app.config["DISCORD_WEBHOOK_CHALL"] = _bool("DISCORD_WEBHOOK_CHALL", True)
 
     """
     Post webhook message when challenge is updated (otherwise only published or hidden)
     """
-    app.config["DISCORD_WEBHOOK_CHALL_UPDATE"] = environ.get(
-        "DISCORD_WEBHOOK_CHALL_UPDATE", False
-    )
+    app.config["DISCORD_WEBHOOK_CHALL_UPDATE"] = _bool("DISCORD_WEBHOOK_CHALL_UPDATE", False)
 
     """
     Post webhook message even if challenge has not yet been published (only relevant when update is enabled)
     """
-    app.config["DISCORD_WEBHOOK_CHALL_UNPUBLISHED"] = environ.get(
-        "DISCORD_WEBHOOK_CHALL_UNPUBLISHED", False
-    )
+    app.config["DISCORD_WEBHOOK_CHALL_UNPUBLISHED"] = _bool("DISCORD_WEBHOOK_CHALL_UNPUBLISHED", False)
 
     """
     Webhook challenge change format string. Valid vars: challenge, category, action (published, hidden or updated)
@@ -54,17 +58,13 @@ def config(app):
 
     This allows conditional formatting: e.g. {'FIRST BLOOD' if data.solves == 1 else ''}
     """
-    app.config["DISCORD_WEBHOOK_FSTRING"] = environ.get(
-        "DISCORD_WEBHOOK_FSTRING", False
-    )
+    app.config["DISCORD_WEBHOOK_FSTRING"] = _bool("DISCORD_WEBHOOK_FSTRING", False)
 
     """
     Post flag sharing caught by the jail_flags plugin (a team solving with a jail or instance flag of another team; the player is not told).
     Off by default: DISCORD_WEBHOOK_URL is usually a public channel, and the sharing team would learn it was caught.
     """
-    app.config["DISCORD_WEBHOOK_JAIL_FLAGS"] = environ.get(
-        "DISCORD_WEBHOOK_JAIL_FLAGS", "false"
-    ).lower() in ("1", "true", "yes", "on")
+    app.config["DISCORD_WEBHOOK_JAIL_FLAGS"] = _bool("DISCORD_WEBHOOK_JAIL_FLAGS", False)
 
     """
     Webhook URL for the flag sharing alerts, e.g. a private admin channel. Unset: DISCORD_WEBHOOK_URL.
