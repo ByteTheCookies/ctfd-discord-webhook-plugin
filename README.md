@@ -6,6 +6,15 @@ The webhook are called only when the CTF is started. Don't attempt to test as an
 
 Functionality made for UIUCTF 2020
 
+Notifications are best-effort and never wait for Discord in a CTFd request. Each
+worker process has one lazy daemon sender and a queue of at most 128 pending
+messages. A full queue drops the new notification; worker exit loses pending
+messages. Connect/read timeouts are 3.05/5 seconds, with no redirects, response-body
+download or retries. Failures are logged without webhook URLs/tokens. The same
+bounded sender handles solve, challenge-update and flag-sharing messages.
+
+Local transport tests (no Discord calls): `python -m unittest discover -s tests`.
+
 ## Setup
 1. Clone this repo into a folder in the plugin folder of your CTFd
 2. Create a new Webhook in your discord server

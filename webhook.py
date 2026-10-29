@@ -1,5 +1,4 @@
 import re
-import threading
 from functools import wraps
 from types import SimpleNamespace
 from urllib.parse import quote
@@ -13,6 +12,7 @@ from flask import request
 from flask.wrappers import Response
 
 from .config import config
+from .delivery import sender
 
 ordinal = lambda n: (
     "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1) * (n % 10 < 4) * n % 10 :: 4])
@@ -95,7 +95,7 @@ def load(app):
                         )
                     embed = DiscordEmbed(description=message)
                     webhook.add_embed(embed)
-                    webhook.execute()
+                    sender.enqueue(webhook)
             return result
 
         return wrapper
@@ -166,7 +166,7 @@ def load(app):
                     )
                     embed = DiscordEmbed(description=message)
                     webhook.add_embed(embed)
-                    webhook.execute()
+                    sender.enqueue(webhook)
             return result
 
         return wrapper
@@ -198,7 +198,6 @@ def load(app):
             message = f"🚨 Flag sharing: `{sanitize(jail_flags._name(user.account_id))}` solved `{sanitize(challenge.name if challenge else str(challenge_id))}` with a flag of `{sanitize(jail_flags._name(other))}`"
             webhook = DiscordWebhook(url=app.config["DISCORD_WEBHOOK_JAIL_FLAGS_URL"])
             webhook.add_embed(DiscordEmbed(description=message, color=0xFF0000))
-            # off the request: discord-webhook 0.8.0 has no timeout, a slow Discord must not hold the submission
-            threading.Thread(target=webhook.execute, daemon=True).start()
+            sender.enqueue(webhook)
 
         jail_flags._alert = jail_alert
